@@ -928,7 +928,7 @@ export default function SwimIQ(){
 
           {/* Stroke Rate Calculator */}
           <Card style={{marginBottom:12,border:"1px solid rgba(0,200,255,0.2)"}}>
-            <SectionTitle color:"#00d4ff">🏊 STROKE RATE CALCULATOR</SectionTitle>
+            <SectionTitle color="#00d4ff">🏊 STROKE RATE CALCULATOR</SectionTitle>
             <div style={{fontSize:11,color:"#7aa8cc",marginBottom:10}}>Count your strokes in a 50 to see your rate vs elite swimmers.</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
               {["freestyle","backstroke","breaststroke","butterfly"].map(s=><Chip key={s} on={strokeStroke===s} onClick={()=>{setStrokeStroke(s);setStrokeResult(null);}} color="#0ea5e9">{s.charAt(0).toUpperCase()+s.slice(1)}</Chip>)}
