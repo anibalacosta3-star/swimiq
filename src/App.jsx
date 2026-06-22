@@ -367,14 +367,50 @@ export default function SwimIQ() {
   async function scanPhoto(){
     if(!pFile)return;
     setPStep("scanning");
+
+    // Normalize event names from any format to SwimIQ standard
+    function normalizeEvent(raw) {
+      if (!raw) return null;
+      const r = raw.toLowerCase().replace(/boys|girls|men|women|&o|mixed|open|meter|metre|yard|yd|m\b/gi,"").replace(/\s+/g," ").trim();
+      const map = [
+        {keys:["50 free","50 fr","50free"],out:"50 Free"},
+        {keys:["100 free","100 fr","100free"],out:"100 Free"},
+        {keys:["200 free","200 fr","200free"],out:"200 Free"},
+        {keys:["500 free","500 fr","500free"],out:"500 Free"},
+        {keys:["1000 free","1000 fr"],out:"1000 Free"},
+        {keys:["1650 free","1650 fr","1650free","mile"],out:"1650 Free"},
+        {keys:["100 back","100 bk","100back","100 backstroke"],out:"100 Back"},
+        {keys:["200 back","200 bk","200back","200 backstroke"],out:"200 Back"},
+        {keys:["100 breast","100 br","100breast","100 breaststroke"],out:"100 Breast"},
+        {keys:["200 breast","200 br","200breast","200 breaststroke"],out:"200 Breast"},
+        {keys:["50 fly","50 butterfly","50fly","50 fl"],out:"50 Fly"},
+        {keys:["100 fly","100 butterfly","100fly","100 fl"],out:"100 Fly"},
+        {keys:["200 fly","200 butterfly","200fly","200 fl"],out:"200 Fly"},
+        {keys:["200 im","200im","200 individual medley","200 i.m."],out:"200 IM"},
+        {keys:["400 im","400im","400 individual medley","400 i.m."],out:"400 IM"},
+      ];
+      for (const entry of map) {
+        for (const key of entry.keys) {
+          if (r.includes(key)) return entry.out;
+        }
+      }
+      return null;
+    }
+
     try{
       const b64=await new Promise(function(res,rej){const r=new FileReader();r.onload=function(){res(r.result.split(",")[1]);};r.onerror=rej;r.readAsDataURL(pFile);});
-      const resp=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5",max_tokens:800,system:'Extract swim meet times. Return ONLY JSON array: [{"event":"100 Free","time":"54.23","meet":null,"date":null}]. If none found return [].',messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:pFile.type||"image/jpeg",data:b64}},{type:"text",text:"Extract all swim times. Return only JSON array."}]}]})});
+      const resp=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5",max_tokens:800,system:'You are extracting swim meet results from a screenshot. Return ONLY a valid JSON array with no other text. Each item must have: event (the swim event name exactly as shown), time (the swimmer\'s time as a string like "54.23" or "1:02.45"), meet (meet name or null), date (YYYY-MM-DD or null). Example: [{"event":"50 Free","time":"35.29","meet":"SWAT Summer Bash","date":"2026-05-17"}]. If no times found return [].',messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:pFile.type||"image/jpeg",data:b64}},{type:"text",text:"Extract all swim times from this meet results screenshot. Return only the JSON array."}]}]})});
       const data=await resp.json();
       const raw=data.content&&data.content.find(function(x){return x.type==="text";});
       const parsed=JSON.parse((raw?raw.text:"[]").replace(/```json|```/g,"").trim());
       if(!Array.isArray(parsed)||!parsed.length){setPErr("No times found. Try a clearer screenshot.");setPStep("preview");}
-      else{setPRes(parsed.map(function(r){return {...r,selected:true,recognized:!!tagsP[r.event]};}));setPStep("review");}
+      else{
+        const mapped=parsed.map(function(r){
+          const normalized=normalizeEvent(r.event)||r.event;
+          return {...r, event:normalized, selected:true, recognized:!!tagsP[normalized]};
+        });
+        setPRes(mapped);setPStep("review");
+      }
     }catch(e){setPErr("Scan failed — try again.");setPStep("preview");}
   }
 
@@ -414,6 +450,48 @@ export default function SwimIQ() {
   const nameCode=(profile.name||"SWIM").toUpperCase().replace(/[^A-Z]/g,"").slice(0,4)||"SWIM";
   const numCode=String(((profile.name||"X").length*37+parseInt(profile.age||0)*13+99)).slice(-4);
   const familyCode=nameCode+"-"+numCode;
+
+  function fixExistingTimes() {
+    const eventMap = [
+      {keys:["50 free","50 fr","50free"],out:"50 Free"},
+      {keys:["100 free","100 fr","100free"],out:"100 Free"},
+      {keys:["200 free","200 fr","200free"],out:"200 Free"},
+      {keys:["500 free","500 fr","500free"],out:"500 Free"},
+      {keys:["100 back","100 bk","100back"],out:"100 Back"},
+      {keys:["200 back","200 bk","200back"],out:"200 Back"},
+      {keys:["100 breast","100 br","100breast"],out:"100 Breast"},
+      {keys:["200 breast","200 br","200breast"],out:"200 Breast"},
+      {keys:["50 fly","50 butterfly","50fly","50 fl"],out:"50 Fly"},
+      {keys:["100 fly","100 butterfly","100fly","100 fl"],out:"100 Fly"},
+      {keys:["200 fly","200 butterfly","200fly"],out:"200 Fly"},
+      {keys:["200 im","200im","200 individual"],out:"200 IM"},
+      {keys:["400 im","400im","400 individual"],out:"400 IM"},
+    ];
+    function normalize(raw) {
+      const r=raw.toLowerCase().replace(/boys|girls|men|women|&o|mixed|open|meter|metre|yard|\byd\b|\bm\b|13|14|11|12|10|split/gi,"").replace(/\s+/g," ").trim();
+      for (const entry of eventMap) {
+        for (const key of entry.keys) {
+          if (r.includes(key)) return entry.out;
+        }
+      }
+      return null;
+    }
+    const newTimes={};
+    const newLogs=logs.map(function(log) {
+      const fixed=normalize(log.stroke);
+      if (fixed && fixed!==log.stroke) {
+        if (!newTimes[fixed] || log.time < newTimes[fixed]) newTimes[fixed]=log.time;
+        return {...log, stroke:fixed};
+      }
+      if (!fixed && tagsP[log.stroke]) newTimes[log.stroke]=log.time;
+      return log;
+    });
+    // merge with existing valid times
+    const merged={...times,...newTimes};
+    setTimes(merged);
+    setLogs(newLogs);
+    notify("Times fixed and mapped to TAGS events! ✅","#00ffaa");
+  }
 
   function saveParentCodes(codes){
     setParentCodes(codes);
@@ -500,6 +578,10 @@ export default function SwimIQ() {
       <div style={{padding:"12px 16px 100px"}}>
 
         {tab==="home"&&<>
+          {Object.keys(times).some(k=>!tagsP[k])&&<div onClick={fixExistingTimes} style={{background:"rgba(255,159,67,0.12)",border:"1px solid rgba(255,159,67,0.4)",borderRadius:12,padding:"12px 16px",marginBottom:12,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><div style={{fontSize:13,fontWeight:800,color:"#ff9f43"}}>⚠️ Times need to be mapped</div><div style={{fontSize:11,color:"#7aa8cc",marginTop:2}}>Tap to fix — connects your scanned times to TAGS events</div></div>
+            <div style={{fontSize:20}}>🔧</div>
+          </div>}
           <Card style={{background:"linear-gradient(135deg,rgba(26,95,255,0.1),rgba(0,200,100,0.07))",border:"1px solid rgba(77,184,255,0.2)",marginBottom:12}}>
             <div style={{fontSize:11,color:"#4db8ff",fontWeight:700,marginBottom:6}}>🏁 NEXT MEET COUNTDOWN</div>
             <input type="date" value={nextMeet} onChange={e=>setNextMeet(e.target.value)} style={{...iStyle,marginBottom:0,fontSize:12,padding:"6px 10px"}}/>
