@@ -34,18 +34,18 @@ const ALL_EVENTS_LCM = ["50 Free","100 Free","200 Free","400 Free","800 Free","1
 // Expected time ranges per event per course — catches splits saved as full times
 const TIME_RANGES = {
   SCY: {
-    "50 Free":{min:20,max:60},"100 Free":{min:45,max:130},"200 Free":{min:100,max:280},
-    "500 Free":{min:270,max:700},"1000 Free":{min:560,max:1400},"1650 Free":{min:950,max:2400},
-    "100 Back":{min:50,max:140},"200 Back":{min:110,max:300},"100 Breast":{min:55,max:150},
-    "200 Breast":{min:120,max:330},"50 Fly":{min:22,max:65},"100 Fly":{min:50,max:140},
-    "200 Fly":{min:110,max:310},"200 IM":{min:110,max:300},"400 IM":{min:240,max:650},
+    "50 Free":{min:18,max:75},"100 Free":{min:40,max:160},"200 Free":{min:90,max:340},
+    "500 Free":{min:250,max:800},"1000 Free":{min:520,max:1600},"1650 Free":{min:880,max:2700},
+    "100 Back":{min:48,max:175},"200 Back":{min:105,max:370},"100 Breast":{min:52,max:185},
+    "200 Breast":{min:115,max:400},"50 Fly":{min:20,max:80},"100 Fly":{min:46,max:175},
+    "200 Fly":{min:105,max:390},"200 IM":{min:105,max:370},"400 IM":{min:230,max:780},
   },
   LCM: {
-    "50 Free":{min:22,max:70},"100 Free":{min:48,max:145},"200 Free":{min:108,max:310},
-    "400 Free":{min:230,max:650},"800 Free":{min:480,max:1350},"1500 Free":{min:900,max:2500},
-    "100 Back":{min:55,max:155},"200 Back":{min:118,max:330},"100 Breast":{min:60,max:165},
-    "200 Breast":{min:130,max:365},"50 Fly":{min:24,max:72},"100 Fly":{min:53,max:155},
-    "200 Fly":{min:118,max:345},"200 IM":{min:118,max:330},"400 IM":{min:255,max:720},
+    "50 Free":{min:22,max:80},"100 Free":{min:45,max:160},"200 Free":{min:100,max:340},
+    "400 Free":{min:220,max:720},"800 Free":{min:460,max:1500},"1500 Free":{min:880,max:2800},
+    "100 Back":{min:52,max:170},"200 Back":{min:115,max:370},"100 Breast":{min:58,max:185},
+    "200 Breast":{min:126,max:410},"50 Fly":{min:23,max:80},"100 Fly":{min:50,max:175},
+    "200 Fly":{min:115,max:390},"200 IM":{min:115,max:380},"400 IM":{min:250,max:800},
   },
 };
 
@@ -385,19 +385,21 @@ export default function SwimIQ() {
     try{
       const b64=await new Promise(function(res,rej){const r=new FileReader();r.onload=function(){res(r.result.split(",")[1]);};r.onerror=rej;r.readAsDataURL(pFile);});
       const resp=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        model:"claude-haiku-4-5",max_tokens:1200,
-        system:`You are reading a swim meet results screenshot. Extract ONLY final race times — NOT split times, NOT reaction times, NOT DQ times.
+        model:"claude-haiku-4-5",max_tokens:1400,
+        system:`You are reading a swim meet results screenshot. Extract all race times and splits.
 
-CRITICAL RULES:
-1. A split is a partial time shown for part of a race (e.g. "40.22" for the first 50m of a 100m race). NEVER save splits as race times.
-2. If you see two times that add up to a total, the TOTAL is the race time. Example: "40.22 + 45.24 = 1:25.46" — save 1:25.46 only.
-3. If only splits are visible and no final time, ADD them together to get the full race time.
-4. Event names from Meet Mobile may include age groups like "Boys 13&O" or distances in meters — normalize them.
-5. Return ONLY a JSON array, no other text.
+RULES:
+1. NEVER save a split as the final race time. A split is a partial time (e.g. first 50m of a 100m race).
+2. If splits AND final time are shown: save the final time, include splits in array.
+3. If ONLY splits shown with no final total: ADD them to get the full time. Include in splits array.
+4. Example: "40.22" and "45.24" with no total → time="1:25.46", splits=["40.22","45.24"]
+5. Strip age group prefixes like "Boys 13&O", "Girls 11-12" from event names.
+6. Return ONLY valid JSON array, no other text.
 
-Format: [{"event":"100 Fly","time":"1:25.46","meet":"Meet Name or null","date":"YYYY-MM-DD or null","course":"LCM or SCY"}]
+Format: [{"event":"100 Fly","time":"1:25.46","meet":"Meet Name or null","date":"YYYY-MM-DD or null","splits":["40.22","45.24"]}]
+Splits field is optional — only include when split times are visible.
 If no times found return [].`,
-        messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:pFile.type||"image/jpeg",data:b64}},{type:"text",text:"Extract all FINAL race times from this meet results screenshot. Remember: add splits together if needed to get the full race time. Return only the JSON array."}]}]
+        messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:pFile.type||"image/jpeg",data:b64}},{type:"text",text:"Extract all swim times and splits. Add splits together if no final total is shown. Return only JSON array."}]}]
       })});
       const data=await resp.json();
       const raw=data.content&&data.content.find(function(x){return x.type==="text";});
@@ -424,7 +426,8 @@ If no times found return [].`,
     let pbCount=0;
     toImport.forEach(function(r){
       const secs=parseTime(r.time);if(!secs)return;
-      const c=r.detectedCourse||course;
+      // ALWAYS save to currently active course — ignore AI-detected course
+      const c=course;
       const existing=c==="SCY"?timesSCY[r.event]:timesLCM[r.event];
       const isPB=!existing||secs<existing;
       const tagsForCourse=(c==="SCY"?TAGS_SCY:TAGS_LCM)[profile.gender]?.[profile.ageGroup]||{};
@@ -435,11 +438,11 @@ If no times found return [].`,
         else setTimesLCM(p=>({...p,[r.event]:secs}));
         pbCount++;
       }
-      setLogs(p=>[{stroke:r.event,time:secs,date:r.date||todayKey,meet:r.meet||"Photo import",isPB,isBonus,course:c,id:Date.now()+Math.random()},...p]);
+      setLogs(p=>[{stroke:r.event,time:secs,date:r.date||todayKey,meet:r.meet||"Photo import",isPB,isBonus,course:c,splits:r.splits||null,id:Date.now()+Math.random()},...p]);
     });
     const xpE=toImport.length*15+(pbCount*35);
     setXP(p=>p+xpE);setPStep("done");
-    notify("Imported "+toImport.length+" times! "+pbCount+" PBs! +"+xpE+" XP 🔥","#00ffaa");
+    notify("Imported "+toImport.length+" times ("+course+")! "+pbCount+" PBs! +"+xpE+" XP 🔥","#00ffaa");
   }
 
   async function askCoach(q){
@@ -454,7 +457,11 @@ If no times found return [].`,
       return s+": "+fmt(first.time)+" → "+fmt(last.time)+" ("+(first.time-last.time>0?"dropped":"gained")+" "+(Math.abs(first.time-last.time)).toFixed(2)+"s over "+eventLogs.length+" swims)";
     }).filter(Boolean).join("\n");
 
-    const systemPrompt=`You are Bob Bowman — Michael Phelps' legendary coach — and you are now coaching ${profile.name}, age ${profile.age}, ${profile.gender==="boys"?"male":"female"}, ${profile.ageGroup} age group, competing in Texas Age Group Swimming (TAGS). You trained the greatest swimmer in history and you are applying that same relentless, detail-obsessed, championship-level coaching philosophy to this young athlete.
+    // Split history — races where we have split data
+    const splitHistory=logs.filter(l=>l.splits&&l.splits.length>1).slice(0,10).map(function(l){
+      const splits=l.splits.map((s,i)=>"Split "+(i+1)+": "+s).join(", ");
+      return l.date+" "+l.course+" "+l.stroke+" ("+fmt(l.time)+"): "+splits;
+    }).join("\n"); — Michael Phelps' legendary coach — and you are now coaching ${profile.name}, age ${profile.age}, ${profile.gender==="boys"?"male":"female"}, ${profile.ageGroup} age group, competing in Texas Age Group Swimming (TAGS). You trained the greatest swimmer in history and you are applying that same relentless, detail-obsessed, championship-level coaching philosophy to this young athlete.
 
 YOUR NON-NEGOTIABLE COACHING PRINCIPLES (from training Phelps):
 1. TURNS ARE FREE SPEED. Every wall is worth 0.5-1.0 seconds if done perfectly. 5+ dolphin kicks off every wall. Streamline must be locked before feet leave the wall.
@@ -480,6 +487,9 @@ ${recentMeets||"No meets logged yet"}
 
 PERFORMANCE PROGRESSION:
 ${progression||"Not enough data for progression analysis yet"}
+
+SPLIT DATA BY RACE (where available — analyze phase by phase):
+${splitHistory||"No split data yet — splits will appear after scanning meet results that show split times"}
 
 COACHING RESPONSE REQUIREMENTS:
 - Be SPECIFIC. Reference his actual events, actual times, actual gaps to TAGS by name.
@@ -611,7 +621,7 @@ COACHING RESPONSE REQUIREMENTS:
               {pRes.map(function(r,i){return(<div key={i} style={{borderRadius:10,marginBottom:8,overflow:"hidden",border:"1px solid "+(r.flagged?"rgba(255,100,100,0.4)":r.selected?"rgba(0,255,170,0.3)":"rgba(255,255,255,0.07)")}}>
                 <div onClick={()=>!r.flagged&&setPRes(p=>p.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",cursor:r.flagged?"default":"pointer",background:r.flagged?"rgba(255,100,100,0.07)":r.selected?"rgba(0,255,170,0.07)":"rgba(255,255,255,0.03)"}}>
                   <div style={{width:20,height:20,borderRadius:"50%",background:r.flagged?"#ff6b6b":r.selected?"#00ffaa":"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:900,flexShrink:0}}>{r.flagged?"⚠":r.selected?"✓":""}</div>
-                  <div style={{flex:1}}><div style={{fontWeight:800,fontSize:13}}>{r.event}</div><div style={{fontSize:10,color:"#7aa8cc"}}>{r.detectedCourse||course}{r.meet?" · "+r.meet:""}{r.date?" · "+r.date:""}</div></div>
+                  <div style={{flex:1}}><div style={{fontWeight:800,fontSize:13}}>{r.event}</div><div style={{fontSize:10,color:"#7aa8cc"}}>{course}{r.meet?" · "+r.meet:""}{r.date?" · "+r.date:""}</div></div>
                   <div style={{fontSize:18,fontWeight:900,color:r.flagged?"#ff6b6b":r.recognized?"#4db8ff":"#7aa8cc"}}>{r.time}</div>
                 </div>
                 {r.flagged&&<div style={{padding:"6px 12px 10px",fontSize:11,color:"#ff9f43"}}>⚠️ {r.flagReason} — deselected for safety. Tap to override.</div>}
