@@ -969,6 +969,11 @@ export default function SwimIQ() {
   const [skillsView, setSkillsView] = useState("library");
   const [nutrTipIndex, setNutrTipIndex] = useState(0);
   const [expanded, setExpanded] = useState(null);
+  const [parentCodes, setParentCodes] = useState(function() { return load().parentCodes || []; });
+  const [newCode, setNewCode] = useState("");
+  const [newChildName, setNewChildName] = useState("");
+  const [selectedChild, setSelectedChild] = useState(0);
+  const [viewMode, setViewMode] = useState("swimmer");
 
   const tagsP = (TAGS[profile.gender] && TAGS[profile.gender][profile.ageGroup]) || {};
   const tagsKeys = Object.keys(tagsP);
@@ -1462,7 +1467,7 @@ export default function SwimIQ() {
           </>}
 
           {trainView === "pool" && <>
-            {(function() {
+            {(() => {
             const workout = getDailyWorkout(profile, times, tagsP, dayOfYear, manualFocus);
             const intensityColor = workout.intensity.includes("Very High") ? "#ff6b6b" : workout.intensity.includes("High") ? "#ff9f43" : workout.intensity.includes("Easy") ? "#00ffaa" : "#ffd700";
             const tagsKeys2 = Object.keys(tagsP);
@@ -1471,7 +1476,6 @@ export default function SwimIQ() {
               if (!t || !tags || t <= tags.q) return null;
               return { s: s, gap: t - tags.q };
             }).filter(Boolean).sort(function(a, b) { return a.gap - b.gap; });
-
             return <>
               {/* Daily workout header */}
               <Card style={{ background: "linear-gradient(135deg,rgba(0,150,255,0.1),rgba(0,200,100,0.08))", border: "1px solid rgba(77,184,255,0.25)", marginBottom: 10 }}>
@@ -1551,7 +1555,7 @@ export default function SwimIQ() {
           </>}
 
         {/* SKILLS — Olympic Level Coaching Library */}
-        {tab === "skills" && (function() {
+        {tab === "skills" && (() => {
           const strokeData = TECHNIQUE_LIBRARY[activeStroke];
           const categoryKeys = strokeData ? Object.keys(strokeData.categories) : [];
 
@@ -1953,10 +1957,9 @@ export default function SwimIQ() {
         </>}
 
         {/* NUTRITION */}
-        {tab === "nutrition" && (function() {
+        {tab === "nutrition" && (() => {
           const tips = (NUTRITION_DATA[nutrTab] && NUTRITION_DATA[nutrTab][nutrAge]) || [];
           const currentTip = tips[nutrTipIndex % tips.length];
-
           return <>
             <Card style={{ background: "linear-gradient(135deg,rgba(0,200,100,0.08),rgba(26,95,255,0.08))", border: "1px solid rgba(0,255,170,0.2)", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "#00ffaa", fontWeight: 700, marginBottom: 4 }}>🥗 FUEL LIKE AN OLYMPIAN</div>
@@ -2040,14 +2043,8 @@ export default function SwimIQ() {
         })()}
 
         {/* FAMILY */}
-        {tab === "family" && (function() {
-          // Detect if this looks like a parent (name contains "dad","mom","parent" or manually set)
+        {tab === "family" && (() => {
           const isParentMode = !!(load().parentCodes);
-          const [parentCodes, setParentCodes] = useState(function() { return load().parentCodes || []; });
-          const [newCode, setNewCode] = useState("");
-          const [newChildName, setNewChildName] = useState("");
-          const [selectedChild, setSelectedChild] = useState(0);
-          const [viewMode, setViewMode] = useState("swimmer"); // swimmer | parent
 
           function saveParentCodes(codes) {
             setParentCodes(codes);
