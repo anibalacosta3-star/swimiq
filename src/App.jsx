@@ -1467,16 +1467,50 @@ export default function SwimIQ() {
           </>}
 
           {trainView === "pool" && <>
-            {(() => {
-            const workout = getDailyWorkout(profile, times, tagsP, dayOfYear, manualFocus);
-            const intensityColor = workout.intensity.includes("Very High") ? "#ff6b6b" : workout.intensity.includes("High") ? "#ff9f43" : workout.intensity.includes("Easy") ? "#00ffaa" : "#ffd700";
-            const tagsKeys2 = Object.keys(tagsP);
-            const closestToQual = tagsKeys2.map(function(s) {
-              const t = times[s]; const tags = tagsP[s];
-              if (!t || !tags || t <= tags.q) return null;
-              return { s: s, gap: t - tags.q };
-            }).filter(Boolean).sort(function(a, b) { return a.gap - b.gap; });
-            return <>
+            <Card style={{ background: "linear-gradient(135deg,rgba(0,150,255,0.1),rgba(0,200,100,0.08))", border: "1px solid rgba(77,184,255,0.25)", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: "#4db8ff", fontWeight: 700, letterSpacing: 1, marginBottom: 2 }}>{dailyWorkout.dayName.toUpperCase()} · DAY {(dayOfYear % 7) + 1} OF 7</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#fff" }}>{dailyWorkout.name}</div>
+                  <div style={{ fontSize: 11, color: "#7aa8cc", marginTop: 2 }}>{dailyWorkout.yards.toLocaleString()} yards</div>
+                  {dailyWorkout.targetEvent && <div style={{ fontSize: 10, color: "#00ffaa", marginTop: 3 }}>🎯 Targeting: {dailyWorkout.targetEvent}</div>}
+                </div>
+                <div style={{ textAlign: "center", padding: "8px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)" }}>
+                  <div style={{ fontSize: 9, color: "#7aa8cc", marginBottom: 2 }}>INTENSITY</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: dailyWorkout.intensity.includes("Very High") ? "#ff6b6b" : dailyWorkout.intensity.includes("High") ? "#ff9f43" : dailyWorkout.intensity.includes("Easy") ? "#00ffaa" : "#ffd700" }}>{dailyWorkout.intensity.split(" —")[0]}</div>
+                </div>
+              </div>
+              <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.15)", fontSize: 11, color: "#ffd700", lineHeight: 1.6 }}>
+                💡 {dailyWorkout.tip}
+              </div>
+            </Card>
+
+            <Card style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 700, marginBottom: 6 }}>🎛️ CHOOSE YOUR FOCUS (OPTIONAL)</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+                <button onClick={function() { setManualFocus(null); }} style={{ padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", background: !manualFocus ? "linear-gradient(135deg,#1a5fff,#0099ff)" : "rgba(255,255,255,0.07)", color: !manualFocus ? "#fff" : "#7aa8cc" }}>🎯 Auto (Closest to TAGS)</button>
+                {tagsKeys.map(function(ev) {
+                  return <button key={ev} onClick={function() { setManualFocus(ev); }} style={{ padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", background: manualFocus === ev ? "linear-gradient(135deg,#7c3aed,#a78bfa)" : "rgba(255,255,255,0.07)", color: manualFocus === ev ? "#fff" : "#7aa8cc" }}>{ev}</button>;
+                })}
+              </div>
+            </Card>
+
+            {dailyWorkout.sets.map(function(set, j) {
+              const isWarmup = j === 0;
+              const isCooldown = j === dailyWorkout.sets.length - 1;
+              return (
+                <div key={j} style={{ display: "flex", gap: 12, padding: "12px 14px", borderRadius: 10, marginBottom: 8, background: isWarmup ? "rgba(0,100,255,0.07)" : isCooldown ? "rgba(0,255,170,0.04)" : "rgba(255,255,255,0.04)", border: "1px solid " + (isWarmup ? "rgba(77,184,255,0.2)" : isCooldown ? "rgba(0,255,170,0.15)" : "rgba(255,255,255,0.08)") }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: isWarmup ? "#4db8ff" : isCooldown ? "#00ffaa" : "#ffd700", flexShrink: 0, paddingTop: 1, minWidth: 22 }}>{isWarmup ? "WU" : isCooldown ? "CD" : j + "."}</div>
+                  <div style={{ fontSize: 13, color: "#d0e8ff", lineHeight: 1.65 }}>{set}</div>
+                </div>
+              );
+            })}
+
+            <div style={{ textAlign: "center", marginTop: 10, padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ fontSize: 10, color: "#7aa8cc" }}>Workout rotates daily · Tomorrow's focus:</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#4db8ff", marginTop: 2 }}>{dailyWorkout.nextWorkout}</div>
+            </div>
+          </>}
               {/* Daily workout header */}
               <Card style={{ background: "linear-gradient(135deg,rgba(0,150,255,0.1),rgba(0,200,100,0.08))", border: "1px solid rgba(77,184,255,0.25)", marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -1546,126 +1580,61 @@ export default function SwimIQ() {
                 <div style={{ fontSize: 12, color: "#d0e8ff", lineHeight: 1.6 }}>This supplements your team practice — it does not replace it. Check with your coach before adding yardage. Stop if you feel pain. Always warm up properly.</div>
               </Card>
 
-              <div style={{ textAlign: "center", marginTop: 10, padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: 10, color: "#7aa8cc" }}>Workout rotates daily · Tomorrow's focus:</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#4db8ff", marginTop: 2 }}>{workout.nextWorkout}</div>
-              </div>
-            </>;
-          })()}
-          </>}
-
         {/* SKILLS — Olympic Level Coaching Library */}
-        {tab === "skills" && (() => {
+        {tab === "skills" && <>
+          {(function() {
           const strokeData = TECHNIQUE_LIBRARY[activeStroke];
           const categoryKeys = strokeData ? Object.keys(strokeData.categories) : [];
-
-          // Auto-select first category when stroke changes
           const currentCat = activeCategory && strokeData && strokeData.categories[activeCategory] ? activeCategory : categoryKeys[0];
-
           const catData = strokeData && strokeData.categories[currentCat];
           const tips = catData ? catData.tips : [];
           const todayTip = tips[dayOfYear % tips.length];
-          const allTips = tips; // Show all tips, highlight today's
-
           return <>
-            {/* Header */}
             <Card style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.08),rgba(26,95,255,0.08))", border: "1px solid rgba(251,191,36,0.2)", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>🎬 OLYMPIC-LEVEL COACHING LIBRARY</div>
-              <div style={{ fontSize: 12, color: "#7aa8cc", lineHeight: 1.6 }}>Technique, body position, kick, pull, turns, starts, mental training — everything. Tips rotate daily so you always learn something new. Sourced from Olympic coaches and world record holders.</div>
+              <div style={{ fontSize: 12, color: "#7aa8cc", lineHeight: 1.6 }}>Technique, body position, kick, pull, turns, starts, mental training — everything. Tips rotate daily.</div>
             </Card>
-
-            {/* View toggle */}
             <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
               {[["library","📚 Full Library"],["daily","⭐ Today's Tip"],["channels","📺 Channels"]].map(function(item) {
                 return <button key={item[0]} onClick={function() { setSkillsView(item[0]); }} style={{ flex: 1, padding: "9px 4px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit", background: skillsView === item[0] ? "linear-gradient(135deg,#b45309,#f59e0b)" : "rgba(255,255,255,0.05)", color: skillsView === item[0] ? "#fff" : "#7aa8cc" }}>{item[1]}</button>;
               })}
             </div>
-
-            {/* TODAY'S TIP — one featured tip per day */}
             {skillsView === "daily" && <>
-              <Card style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.1),rgba(255,100,0,0.08))", border: "1px solid rgba(251,191,36,0.3)", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#fbbf24", fontWeight: 700, letterSpacing: 1.5, marginBottom: 4 }}>TODAY'S FEATURED TIP</div>
-                <div style={{ fontSize: 12, color: "#fbbf24" }}>{strokeData && strokeData.label} · {catData && catData.label}</div>
-              </Card>
               {strokeData && catData && (
                 <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 20, border: "1px solid rgba(251,191,36,0.25)", marginBottom: 12 }}>
-                  <div style={{ fontSize: 32, marginBottom: 12 }}>💡</div>
+                  <div style={{ fontSize: 10, color: "#fbbf24", fontWeight: 700, marginBottom: 4 }}>⭐ TODAY'S TIP — {strokeData.label} · {catData.label}</div>
                   <div style={{ fontSize: 15, color: "#fff", lineHeight: 1.75, fontWeight: 600 }}>{todayTip}</div>
-                  <div style={{ marginTop: 14, fontSize: 10, color: "#7aa8cc" }}>Tip {(dayOfYear % tips.length) + 1} of {tips.length} in this category · New tip tomorrow</div>
                 </div>
               )}
-              <div style={{ fontSize: 11, color: "#7aa8cc", marginBottom: 10 }}>All tips for {catData && catData.label}:</div>
-              {allTips.map(function(tip, i) {
-                const isToday = i === (dayOfYear % tips.length);
-                return (
-                  <div key={i} style={{ background: isToday ? "rgba(251,191,36,0.08)" : "rgba(255,255,255,0.03)", borderRadius: 12, padding: "12px 14px", marginBottom: 7, border: "1px solid " + (isToday ? "rgba(251,191,36,0.35)" : "rgba(255,255,255,0.06)"), display: "flex", gap: 10 }}>
-                    <div style={{ flexShrink: 0 }}>
-                      {isToday ? <div style={{ fontSize: 16 }}>⭐</div> : <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#7aa8cc" }}>{i + 1}</div>}
-                    </div>
-                    <div style={{ fontSize: 13, color: isToday ? "#ffd700" : "#d0e8ff", lineHeight: 1.65 }}>{tip}</div>
-                  </div>
-                );
-              })}
-              {/* Browse other strokes */}
-              <div style={{ fontSize: 11, color: "#7aa8cc", marginTop: 16, marginBottom: 8 }}>Browse other strokes:</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {Object.keys(TECHNIQUE_LIBRARY).map(function(sk) {
                   return <Chip key={sk} on={activeStroke === sk} onClick={function() { setActiveStroke(sk); setActiveCategory(null); }} color="#b45309">{TECHNIQUE_LIBRARY[sk].label}</Chip>;
                 })}
               </div>
             </>}
-
-            {/* FULL LIBRARY */}
             {skillsView === "library" && <>
-              {/* Stroke selector */}
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 12 }}>
                 {Object.keys(TECHNIQUE_LIBRARY).map(function(sk) {
-                  const sd = TECHNIQUE_LIBRARY[sk];
-                  return <Chip key={sk} on={activeStroke === sk} onClick={function() { setActiveStroke(sk); setActiveCategory(null); }} color="#7c3aed">{sd.label}</Chip>;
+                  return <Chip key={sk} on={activeStroke === sk} onClick={function() { setActiveStroke(sk); setActiveCategory(null); }} color="#7c3aed">{TECHNIQUE_LIBRARY[sk].label}</Chip>;
                 })}
               </div>
-
-              {/* Category selector */}
               {strokeData && (
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 14 }}>
                   {Object.keys(strokeData.categories).map(function(ck) {
-                    const cd = strokeData.categories[ck];
-                    return (
-                      <button key={ck} onClick={function() { setActiveCategory(ck); }} style={{ padding: "6px 12px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", background: currentCat === ck ? "linear-gradient(135deg,#b45309,#f59e0b)" : "rgba(255,255,255,0.07)", color: currentCat === ck ? "#fff" : "#7aa8cc" }}>
-                        {cd.label}
-                      </button>
-                    );
+                    return <button key={ck} onClick={function() { setActiveCategory(ck); }} style={{ padding: "6px 12px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", background: currentCat === ck ? "linear-gradient(135deg,#b45309,#f59e0b)" : "rgba(255,255,255,0.07)", color: currentCat === ck ? "#fff" : "#7aa8cc" }}>{strokeData.categories[ck].label}</button>;
                   })}
                 </div>
               )}
-
-              {/* Tips for selected category */}
-              {catData && <>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#fbbf24" }}>{strokeData.label} — {catData.label}</div>
-                  <div style={{ fontSize: 9, color: "#7aa8cc" }}>⭐ = today's featured tip</div>
-                </div>
-                {catData.tips.map(function(tip, i) {
-                  const isToday = i === (dayOfYear % catData.tips.length);
-                  return (
-                    <div key={i} style={{ background: isToday ? "rgba(251,191,36,0.07)" : "rgba(255,255,255,0.03)", borderRadius: 12, padding: "14px 16px", marginBottom: 8, border: "1px solid " + (isToday ? "rgba(251,191,36,0.3)" : "rgba(251,191,36,0.08)"), display: "flex", gap: 10 }}>
-                      <div style={{ flexShrink: 0 }}>
-                        {isToday
-                          ? <div style={{ fontSize: 16 }}>⭐</div>
-                          : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(251,191,36,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fbbf24", fontWeight: 800 }}>{i + 1}</div>
-                        }
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, color: isToday ? "#ffd700" : "#d0e8ff", lineHeight: 1.7 }}>{tip}</div>
-                        {isToday && <div style={{ fontSize: 9, color: "#fbbf24", marginTop: 4 }}>Today's featured tip</div>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </>}
+              {catData && catData.tips.map(function(tip, i) {
+                const isToday = i === (dayOfYear % catData.tips.length);
+                return (
+                  <div key={i} style={{ background: isToday ? "rgba(251,191,36,0.07)" : "rgba(255,255,255,0.03)", borderRadius: 12, padding: "14px 16px", marginBottom: 8, border: "1px solid " + (isToday ? "rgba(251,191,36,0.3)" : "rgba(251,191,36,0.08)"), display: "flex", gap: 10 }}>
+                    <div style={{ flexShrink: 0 }}>{isToday ? <div style={{ fontSize: 16 }}>⭐</div> : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(251,191,36,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fbbf24", fontWeight: 800 }}>{i + 1}</div>}</div>
+                    <div style={{ fontSize: 13, color: isToday ? "#ffd700" : "#d0e8ff", lineHeight: 1.7 }}>{tip}</div>
+                  </div>
+                );
+              })}
             </>}
-
-            {/* CHANNELS */}
             {skillsView === "channels" && CHANNELS.map(function(ch) {
               return (
                 <div key={ch.name} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "14px", marginBottom: 8, border: "1px solid rgba(251,191,36,0.12)" }}>
@@ -1681,7 +1650,8 @@ export default function SwimIQ() {
               );
             })}
           </>;
-        })()}
+          })()}
+        </>}
 
         {/* MEETS */}
         {tab === "meets" && <>
@@ -1957,7 +1927,8 @@ export default function SwimIQ() {
         </>}
 
         {/* NUTRITION */}
-        {tab === "nutrition" && (() => {
+        {tab === "nutrition" && <>
+          {(function() {
           const tips = (NUTRITION_DATA[nutrTab] && NUTRITION_DATA[nutrTab][nutrAge]) || [];
           const currentTip = tips[nutrTipIndex % tips.length];
           return <>
@@ -2040,10 +2011,12 @@ export default function SwimIQ() {
               <div style={{ fontSize: 12, color: "#d0e8ff", lineHeight: 1.7 }}>{age <= 14 ? "This is evidence-based general guidance for young athletes. Always talk to your parents and doctor before making major dietary changes. Never restrict food intake — growing athletes need adequate fuel to train and develop properly." : "Evidence-based sports nutrition guidance. For a fully personalized plan, consult a Registered Dietitian who specializes in sports performance."}</div>
             </Card>
           </>;
-        })()}
+          })()}
+        </>}
 
         {/* FAMILY */}
-        {tab === "family" && (() => {
+        {tab === "family" && <>
+          {(function() {
           const isParentMode = !!(load().parentCodes);
 
           function saveParentCodes(codes) {
@@ -2182,7 +2155,8 @@ export default function SwimIQ() {
               </Card>}
             </>}
           </>;
-        })()}
+          })()}
+        </>}
 
       </div>
     </div>
