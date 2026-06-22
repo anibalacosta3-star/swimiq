@@ -1132,27 +1132,17 @@ export default function SwimIQ() {
       messages: [{ role: "user", content: q }]
     };
     try {
-      const apiKey = process.env.REACT_APP_ANTHROPIC_KEY;
-      let r;
-      if (apiKey) {
-        r = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        r = await fetch("/api/coach", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }
+      const r = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
       const d = await r.json();
       const block = d.content && d.content.find(function (x) { return x.type === "text"; });
       setAiA(block ? block.text : "Coach unavailable — try again!");
       setMissions(p => ({ ...p, [todayKey]: { ...p[todayKey], coach_question: true } }));
     } catch (e) {
-      setAiA("Could not reach AI Coach: " + e.message);
+      setAiA("Error: " + e.message);
     }
     setAiLoad(false);
   }
