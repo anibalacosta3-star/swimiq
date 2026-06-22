@@ -1082,7 +1082,7 @@ export default function SwimIQ() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-haiku-4-5",
           max_tokens: 800,
           system: 'Extract swim meet times from this image. Return ONLY a JSON array: [{"event":"100 Free","time":"54.23","meet":"name or null","date":"YYYY-MM-DD or null"}]. If no times found return [].',
           messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: pFile.type || "image/jpeg", data: b64 } }, { type: "text", text: "Extract all swim times. Return only JSON array." }] }]
@@ -1126,7 +1126,7 @@ export default function SwimIQ() {
       return s + ": " + fmt(t) + " (" + (t <= tg.q ? "QUALIFIED" : (t - tg.q).toFixed(2) + "s from cut") + ")";
     }).filter(Boolean).join(", ");
     const payload = {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5",
       max_tokens: 1000,
       system: "You are an elite USA Swimming coach helping " + profile.name + ", age " + profile.age + ", " + (profile.gender === "boys" ? "male" : "female") + ", " + profile.ageGroup + " age group, goal: " + profile.mode + ". Be encouraging, specific, science-based, fun. Use emojis. Under 220 words. Current times: " + (summary || "none logged yet") + ".",
       messages: [{ role: "user", content: q }]
