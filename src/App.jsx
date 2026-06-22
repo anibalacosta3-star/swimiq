@@ -341,10 +341,13 @@ export default function SwimIQ() {
     const secs=parseTime(lTm);
     if(!secs||!lSt){notify("Pick an event and enter a time!","#ff6b6b");return;}
     const tags=tagsP[lSt];
-    const isPB=!times[lSt]||secs<times[lSt];
+    // ALWAYS keep fastest — never overwrite a better time
+    const existingBest=times[lSt];
+    const isPB=!existingBest||secs<existingBest;
     const isBonus=!!(tags&&secs<=tags.b);
     const isQual=!!(tags&&secs<=tags.q);
     if(isPB)setTimes(p=>({...p,[lSt]:secs}));
+    else notify("Time logged but your best ("+fmt(existingBest)+") is still faster 💪","#4db8ff");
     setLogs(p=>[{stroke:lSt,time:secs,date:lDt,meet:lMt,isPB,isBonus,id:Date.now()},...p]);
     setLTm("");setLMt("");
     setMissions(p=>({...p,[todayKey]:{...p[todayKey],log_today:true}}));
@@ -420,22 +423,83 @@ export default function SwimIQ() {
     const newT={...times};const newE=[];
     toImport.forEach(function(r){
       const secs=parseTime(r.time);if(!secs)return;
-      const tags=tagsP[r.event];const isPB=!newT[r.event]||secs<newT[r.event];
+      const tags=tagsP[r.event];
+      // ALWAYS keep the fastest time — never replace a better time with a slower one
+      const existingBest=newT[r.event];
+      const isPB=!existingBest||secs<existingBest;
       const isBonus=!!(tags&&secs<=tags.b);
       if(isPB)newT[r.event]=secs;
+      // Always log the session even if not a PB
       newE.push({stroke:r.event,time:secs,date:r.date||todayKey,meet:r.meet||"Photo import",isPB,isBonus,id:Date.now()+Math.random()});
     });
     setTimes(newT);setLogs(p=>[...newE,...p]);
     const xpE=newE.reduce(function(a,e){return a+(e.isBonus?150:e.isPB?50:15);},0);
     setXP(p=>p+xpE);setPStep("done");
-    notify("Imported "+toImport.length+" times! +"+xpE+" XP","#00ffaa");
+    const pbs=newE.filter(e=>e.isPB).length;
+    notify("Imported "+toImport.length+" times!"+(pbs>0?" "+pbs+" new PBs! 🔥":"")+" +"+xpE+" XP","#00ffaa");
   }
 
   async function askCoach(q){
     setAiLoad(true);setAiA("");
-    const summary=tagsKeys.map(function(s){const t=times[s];const tg=tagsP[s];if(!t||!tg)return null;return s+": "+fmt(t)+" ("+(t<=tg.q?"QUALIFIED":(t-tg.q).toFixed(2)+"s from cut")+")";}).filter(Boolean).join(", ");
+
+    // Build complete athlete profile for the AI
+    const eventHistory=tagsKeys.map(function(s){
+      const t=times[s];const tg=tagsP[s];if(!t||!tg)return null;
+      const gap=(t-tg.q).toFixed(2);
+      const pct=((t-tg.q)/tg.q*100).toFixed(1);
+      return s+": best="+fmt(t)+(t<=tg.b?" (BONUS ✅)":t<=tg.q?" (QUALIFIED ✅)":(" — "+gap+"s from cut, "+pct+"% away"));
+    }).filter(Boolean).join("\n");
+
+    // Recent meet history
+    const recentMeets=logs.slice(0,15).map(function(l){
+      return l.date+" "+l.stroke+": "+fmt(l.time)+(l.meet?" at "+l.meet:"")+(l.isPB?" (PB)":"");
+    }).join("\n");
+
+    // Progression analysis per event
+    const progression=tagsKeys.map(function(s){
+      const eventLogs=logs.filter(l=>l.stroke===s).sort((a,b)=>new Date(a.date)-new Date(b.date));
+      if(eventLogs.length<2)return null;
+      const first=eventLogs[0];const last=eventLogs[eventLogs.length-1];
+      const drop=(first.time-last.time).toFixed(2);
+      return s+": dropped "+drop+"s over "+eventLogs.length+" swims ("+fmt(first.time)+" → "+fmt(last.time)+")";
+    }).filter(Boolean).join("\n");
+
+    const systemPrompt=`You are Bob Bowman — Michael Phelps' legendary coach — helping ${profile.name}, age ${profile.age}, ${profile.gender==="boys"?"male":"female"}, ${profile.ageGroup} age group, competing in Texas Age Group Swimming (TAGS). You have trained the greatest swimmer in history and now you are applying that same relentless, detail-obsessed coaching philosophy to help this young swimmer reach their full potential.
+
+YOUR COACHING PHILOSOPHY:
+- Every race has a story told in splits. Identify exactly where time is being lost — the start, the first 25, the turn, the back half, the finish.
+- Technical precision matters more than effort. One mechanical fix can drop more time than months of extra yardage.
+- Mental preparation is as important as physical. Phelps visualized every race thousands of times.
+- Train your weaknesses obsessively. Champion swimmers practice what they're bad at, not just what they're good at.
+- Turns and underwater dolphins are free speed. Most age groupers waste 1-2 seconds per wall.
+- The high elbow catch is the foundation of every great swimmer's pull. Check it first, always.
+- Negative splitting wins races. Going out too fast costs more than it gains.
+
+ATHLETE DATA:
+Name: ${profile.name}
+Age: ${profile.age} | Gender: ${profile.gender} | Age Group: ${profile.ageGroup}
+Primary Goal: ${profile.mode}
+
+CURRENT BEST TIMES vs TAGS STANDARDS:
+${eventHistory||"No times logged yet"}
+
+RECENT MEET HISTORY (last 15 swims):
+${recentMeets||"No recent meets"}
+
+TIME PROGRESSION (improvement over season):
+${progression||"Not enough data yet"}
+
+YOUR RESPONSE STYLE:
+- Be direct, specific, and actionable. No generic advice.
+- Reference his ACTUAL times and events by name.
+- When analyzing a race, break it down by split phase: start (0-15m), first turn, back half, finish.
+- Give the ONE most important drill or fix he should do THIS WEEK.
+- Be encouraging but honest — Phelps' coach never sugar-coated weakness.
+- Use emojis strategically. Keep response under 280 words but pack it with value.
+- End every response with one specific workout set he should do tomorrow related to what you just told him.`;
+
     try{
-      const r=await fetch("/api/coach",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5",max_tokens:1000,system:"You are an elite USA Swimming coach helping "+profile.name+", age "+profile.age+", "+(profile.gender==="boys"?"male":"female")+", "+profile.ageGroup+" age group, goal: "+profile.mode+". Be encouraging, specific, fun. Use emojis. Under 220 words. Times: "+(summary||"none logged yet")+".",messages:[{role:"user",content:q}]})});
+      const r=await fetch("/api/coach",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5",max_tokens:1200,system:systemPrompt,messages:[{role:"user",content:q}]})});
       const d=await r.json();
       const block=d.content&&d.content.find(function(x){return x.type==="text";});
       setAiA(block?block.text:"Coach unavailable — try again!");
@@ -896,7 +960,7 @@ export default function SwimIQ() {
           <Card style={{background:"rgba(0,100,255,0.07)"}}>
             <div style={{fontSize:13,fontWeight:800,color:"#4db8ff",marginBottom:4}}>🤖 AI COACH — Powered by Claude</div>
             <div style={{fontSize:11,color:"#7aa8cc",marginBottom:12}}>Your profile and all logged times are pre-loaded. Ask anything.</div>
-            {["How close am I to TAGS and what is my fastest path?","Build me a personalized 4-week plan to drop time","How do I fix my turns and underwater kicks?","What should I eat the week before my big meet?","How do I stay calm and confident on the blocks?","Explain how to perfect the high elbow catch in freestyle"].map(q=><button key={q} onClick={()=>askCoach(q)} style={{display:"block",width:"100%",textAlign:"left",marginBottom:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(77,184,255,0.12)",color:"#d0e8ff",borderRadius:10,padding:"11px 14px",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>{q}</button>)}
+            {["Analyze all my times — where am I losing the most time and what should I fix first?","Break down my race splits and tell me exactly where I die in each event","What are my 3 biggest technical weaknesses based on my times?","Build me a 4-week plan to drop the most time before my next meet","How close am I to TAGS and what is the single fastest path to qualify?","What should my turns and underwater dolphins look like? How many kicks?","Design my warm-up and race-day routine for a big meet"].map(q=><button key={q} onClick={()=>askCoach(q)} style={{display:"block",width:"100%",textAlign:"left",marginBottom:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(77,184,255,0.12)",color:"#d0e8ff",borderRadius:10,padding:"11px 14px",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>{q}</button>)}
             <div style={{display:"flex",gap:8,marginTop:8}}>
               <input value={aiQ} onChange={e=>setAiQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&aiQ&&askCoach(aiQ)} placeholder="Ask anything..." style={{...iStyle,flex:1,margin:0}}/>
               <button onClick={()=>aiQ&&askCoach(aiQ)} style={{background:"linear-gradient(135deg,#1a5fff,#0099ff)",border:"none",color:"#fff",borderRadius:10,padding:"10px 18px",fontWeight:800,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>Ask</button>
