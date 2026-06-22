@@ -963,6 +963,12 @@ export default function SwimIQ() {
   const [splitResult, setSplitResult] = useState(null);
   const [convEvent, setConvEvent] = useState("100 Free");
   const [convTime, setConvTime] = useState("");
+  const [manualFocus, setManualFocus] = useState(null);
+  const [activeStroke, setActiveStroke] = useState("freestyle");
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [skillsView, setSkillsView] = useState("library");
+  const [nutrTipIndex, setNutrTipIndex] = useState(0);
+  const [expanded, setExpanded] = useState(null);
 
   const tagsP = (TAGS[profile.gender] && TAGS[profile.gender][profile.ageGroup]) || {};
   const tagsKeys = Object.keys(tagsP);
@@ -1455,12 +1461,10 @@ export default function SwimIQ() {
             })}
           </>}
 
-          {trainView === "pool" && (function() {
-            const [manualFocus, setManualFocus] = useState(null);
+          {trainView === "pool" && <>
+            {(function() {
             const workout = getDailyWorkout(profile, times, tagsP, dayOfYear, manualFocus);
             const intensityColor = workout.intensity.includes("Very High") ? "#ff6b6b" : workout.intensity.includes("High") ? "#ff9f43" : workout.intensity.includes("Easy") ? "#00ffaa" : "#ffd700";
-
-            // Events closest to qualifying (not yet qualified)
             const tagsKeys2 = Object.keys(tagsP);
             const closestToQual = tagsKeys2.map(function(s) {
               const t = times[s]; const tags = tagsP[s];
@@ -1544,14 +1548,10 @@ export default function SwimIQ() {
               </div>
             </>;
           })()}
-        </>}
+          </>}
 
         {/* SKILLS — Olympic Level Coaching Library */}
         {tab === "skills" && (function() {
-          const [activeStroke, setActiveStroke] = useState("freestyle");
-          const [activeCategory, setActiveCategory] = useState(null);
-          const [skillsView, setSkillsView] = useState("library"); // library | daily | channels
-
           const strokeData = TECHNIQUE_LIBRARY[activeStroke];
           const categoryKeys = strokeData ? Object.keys(strokeData.categories) : [];
 
@@ -1954,10 +1954,8 @@ export default function SwimIQ() {
 
         {/* NUTRITION */}
         {tab === "nutrition" && (function() {
-          const [nutrTipIndex, setNutrTipIndex] = useState(dayOfYear % 7);
           const tips = (NUTRITION_DATA[nutrTab] && NUTRITION_DATA[nutrTab][nutrAge]) || [];
           const currentTip = tips[nutrTipIndex % tips.length];
-          const [expanded, setExpanded] = useState(null);
 
           return <>
             <Card style={{ background: "linear-gradient(135deg,rgba(0,200,100,0.08),rgba(26,95,255,0.08))", border: "1px solid rgba(0,255,170,0.2)", marginBottom: 12 }}>
@@ -1970,7 +1968,7 @@ export default function SwimIQ() {
             {/* Tab selector */}
             <div style={{ display: "flex", gap: 5, marginBottom: 14, flexWrap: "wrap" }}>
               {[["daily","🍽️ Daily Eating"],["hydration","💧 Hydration"],["preMeet","🏁 Pre-Meet"]].map(function(item) {
-                return <button key={item[0]} onClick={function() { setNutrTab(item[0]); setExpanded(null); setNutrTipIndex(dayOfYear % 7); }} style={{ flex: 1, padding: "9px 4px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit", background: nutrTab === item[0] ? "linear-gradient(135deg,#00cc88,#0099ff)" : "rgba(255,255,255,0.05)", color: nutrTab === item[0] ? "#fff" : "#7aa8cc", minWidth: "30%" }}>{item[1]}</button>;
+                return <button key={item[0]} onClick={function() { setNutrTab(item[0]); setExpanded(null); setNutrTipIndex(0); }} style={{ flex: 1, padding: "9px 4px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit", background: nutrTab === item[0] ? "linear-gradient(135deg,#00cc88,#0099ff)" : "rgba(255,255,255,0.05)", color: nutrTab === item[0] ? "#fff" : "#7aa8cc", minWidth: "30%" }}>{item[1]}</button>;
               })}
             </div>
 
