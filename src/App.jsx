@@ -475,7 +475,7 @@ export default function SwimIQ() {
             <div style={{fontSize:28}}>🏊</div>
             <div>
               <div style={{fontSize:20,fontWeight:900,background:"linear-gradient(90deg,#fff,#4db8ff,#00ffaa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>SwimIQ</div>
-              <div style={{fontSize:9,color:"#7aa8cc"}}>Hey {profile.name} 👋</div>
+              <div style={{fontSize:9,color:"#7aa8cc"}}>Hey {profile.name} 👋 · <span onClick={()=>{if(window.confirm("Reset profile? This clears all data.")){localStorage.removeItem("swimiq_v6");window.location.reload();}}} style={{color:"#ff6b6b",cursor:"pointer",textDecoration:"underline"}}>Reset</span></div>
             </div>
           </div>
           <div style={{textAlign:"right"}}>
